@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+    <h2 class="text-lg font-semibold mb-4 text-white">Reservá tu turno</h2>
+
+    <form action="/reservar" method="POST" class="space-y-4">
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Nombre completo</label>
+            <input type="text" name="cliente_nombre" placeholder="Juan Pérez" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+        </div>
+
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Teléfono / WhatsApp</label>
+            <input type="tel" name="cliente_telefono" placeholder="2611234567" required 
+                    minlength="10" 
+                    maxlength="10"
+                    pattern="[0-9]+" 
+                    title="Debe ingresar exactamente 10 números, sin espacios ni guiones"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+        </div>
+
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Servicio</label>
+            <select id="servicio" name="servicio_id" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                {% for s in servicios %}
+                <option value="{{ s.id }}">{{ s.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Fecha</label>
+            <input type="date" id="fecha" name="fecha" value="{{ hoy }}" min="{{ hoy }}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+        </div>
+
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Horario disponible</label>
+            <select id="hora" name="hora" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                <option value="">Selecciona fecha y servicio primero...</option>
+            </select>
+        </div>
+
+        <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-bold py-3 rounded-lg mt-4 transition">
+            Confirmar Turno
+        </button>
+    </form>
+</div>
+
+<script>
+// Recibimos los bloqueos desde el servidor
+const diasBloqueados = {{ dias_js | safe }};
+const fechasBloqueadas = {{ fechas_cerradas | safe }};
+
+// Inicializamos el calendario inteligente
+flatpickr("#fecha", {
+    locale: "es",
+    minDate: "today",
+    disable: [
+        function(date) {
+            // Retorna 'true' si el día de la semana está en la lista negra
+            return diasBloqueados.includes(date.getDay());
+        },
+        ...fechasBloqueadas // Suma a la lista negra las fechas específicas
+    ],
+    onChange: cargarHorarios
+});
+
+async function cargarHorarios() {
+    const fecha = document.getElementById('fecha').value;
+    const servicioId = document.getElementById('servicio').value;
+    const horaSelect = document.getElementById('hora');
+
+    if (!fecha || !servicioId) return;
+
+    horaSelect.innerHTML = '<option>Cargando horarios...</option>';
+    const res = await fetch(`/api/disponibilidad?fecha=${fecha}&servicio_id=${servicioId}`);
+    const data = await res.json();
+
+    horaSelect.innerHTML = '';
+    if (data.disponibles.length === 0) {
+        horaSelect.innerHTML = '<option value="">No hay turnos disponibles para este día</option>';
+    } else {
+        data.disponibles.forEach(hora => {
+            const opt = document.createElement('option');
+            opt.value = hora;
+            opt.textContent = `${hora} hs`;
+            horaSelect.appendChild(opt);
+        });
+    }
+}
+
+// Ejecutamos la carga inicial (si el input de fecha no está vacío por Flatpickr)
+if (document.getElementById('fecha').value !== "") {
+    cargarHorarios();
+}
+document.getElementById('servicio').addEventListener('change', cargarHorarios);
+</script>
+{% endblock %}

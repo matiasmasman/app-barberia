@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+        <h2 class="text-xl font-bold text-violet-500">Horario Habitual</h2>
+        <div class="flex gap-4">
+            <a href="/admin/config/excepciones" class="text-sm text-slate-300 hover:text-white transition">Ir a Excepciones</a>
+            <a href="/admin" class="text-sm text-violet-400 hover:text-violet-300 transition">Volver a Turnos</a>
+        </div>
+    </div>
+
+    <form action="/admin/config/horarios" method="POST" class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 space-y-3">
+        
+        <!-- Texto de ayuda movido arriba -->
+        <div class="bg-amber-900/20 border border-amber-700/50 rounded-lg p-3 mb-4">
+            <p class="text-xs text-amber-500 text-center font-medium">* Para trabajar de corrido, llená solo el Primer Turno y dejá vacío el Segundo Turno.</p>
+        </div>
+
+        <!-- Encabezados de columnas -->
+        <div class="hidden md:flex text-[10px] uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-700">
+            <div class="w-1/4">Día</div>
+            <div class="w-1/3 text-center">Primer Turno (Mañana)</div>
+            <div class="w-1/3 text-center">Segundo Turno (Tarde)</div>
+        </div>
+
+        {% for h in horarios %}
+        <div class="flex flex-col md:flex-row items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-700 gap-4">
+            <!-- Checkbox Día -->
+            <div class="w-full md:w-1/4 flex items-center">
+                <input type="checkbox" name="abierto_{{ h.dia_semana }}" value="1" {% if h.abierto %}checked{% endif %} onchange="toggleFila({{ h.dia_semana }})" class="w-4 h-4 text-violet-600 bg-slate-800 border-slate-600 rounded">
+                <span class="ml-3 font-medium text-white">{{ mapa_dias[h.dia_semana] }}</span>
+            </div>
+            
+            <!-- Contenedor de Horas (Se bloquea si está desmarcado) -->
+            <div id="horas_{{ h.dia_semana }}" class="flex flex-col md:flex-row w-full md:w-3/4 gap-4 {% if not h.abierto %}opacity-30 pointer-events-none{% endif %} transition-opacity">
+                <!-- Turno 1 -->
+                <div class="flex w-full md:w-1/2 gap-2 items-center justify-center bg-slate-800/50 p-2 rounded">
+                    <input type="time" name="apertura_1_{{ h.dia_semana }}" value="{{ h.apertura_1.strftime('%H:%M') }}" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white">
+                    <span class="text-slate-500">-</span>
+                    <input type="time" name="cierre_1_{{ h.dia_semana }}" value="{{ h.cierre_1.strftime('%H:%M') }}" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white">
+                </div>
+                <!-- Turno 2 -->
+                <div class="flex w-full md:w-1/2 gap-2 items-center justify-center bg-slate-800/50 p-2 rounded">
+                    <input type="time" name="apertura_2_{{ h.dia_semana }}" value="{% if h.apertura_2 %}{{ h.apertura_2.strftime('%H:%M') }}{% endif %}" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white" placeholder="Opcional">
+                    <span class="text-slate-500">-</span>
+                    <input type="time" name="cierre_2_{{ h.dia_semana }}" value="{% if h.cierre_2 %}{{ h.cierre_2.strftime('%H:%M') }}{% endif %}" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold py-3 rounded-lg transition mt-4">Guardar Horarios</button>
+    </form>
+</div>
+
+<script>
+function toggleFila(dia) {
+    const contenedor = document.getElementById('horas_' + dia);
+    const checkbox = document.querySelector(`input[name="abierto_${dia}"]`);
+    if (checkbox.checked) {
+        contenedor.classList.remove('opacity-30', 'pointer-events-none');
+    } else {
+        contenedor.classList.add('opacity-30', 'pointer-events-none');
+    }
+}
+</script>
+{% endblock %}

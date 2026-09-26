@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+        <h2 class="text-xl font-bold text-violet-500">Feriados y Excepciones</h2>
+        <div class="flex gap-4">
+            <a href="/admin/config/horarios" class="text-sm text-slate-300 hover:text-white transition">Ir a Horarios</a>
+            <a href="/admin" class="text-sm text-violet-400 hover:text-violet-300 transition">Volver a Turnos</a>
+        </div>
+    </div>
+
+    <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+        <form action="/admin/config/excepciones" method="POST" class="bg-slate-900/50 p-4 rounded-lg mb-8 border border-slate-700">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs uppercase text-slate-400 mb-1">Fecha exacta</label>
+                    <input type="date" name="fecha" required class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-slate-400 mb-1">Motivo</label>
+                    <input type="text" name="motivo" placeholder="Ej: Feriado" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs uppercase text-slate-400 mb-1">Desde hora (Opcional)</label>
+                    <input type="time" name="hora_inicio" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-slate-400 mb-1">Hasta hora (Opcional)</label>
+                    <input type="time" name="hora_fin" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white">
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-lg border border-slate-500 transition">Agregar Excepción</button>
+        </form>
+
+        <h3 class="text-sm font-semibold text-slate-300 mb-3">Próximos bloqueos</h3>
+        <div class="divide-y divide-slate-700">
+            {% for e in excepciones %}
+            <div class="py-3 flex justify-between items-center">
+                <div>
+                    <p class="font-medium text-white">{{ e.fecha.strftime('%d/%m/%Y') }} - <span class="text-violet-400">{{ e.motivo }}</span></p>
+                    <p class="text-xs text-slate-400">
+                        {% if e.hora_inicio and e.hora_fin %}
+                            De {{ e.hora_inicio.strftime('%H:%M') }} a {{ e.hora_fin.strftime('%H:%M') }}
+                        {% else %} Todo el día cerrado {% endif %}
+                    </p>
+                </div>
+                <form action="/admin/config/excepciones/eliminar/{{ e.id }}" method="POST">
+                    <button type="submit" class="text-xs bg-red-900/30 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition">Borrar</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-500 italic">No hay excepciones programadas.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
