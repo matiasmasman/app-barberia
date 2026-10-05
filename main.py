@@ -20,7 +20,7 @@ security = HTTPBasic()
 
 def verificar_admin(credentials: HTTPBasicCredentials = Depends(security)):
     usuario_valido = secrets.compare_digest(credentials.username, "admin")
-    pass_valido = secrets.compare_digest(credentials.password, "1234")
+    pass_valido = secrets.compare_digest(credentials.password, "44905416")
 
     if not (usuario_valido and pass_valido):
         raise HTTPException(
@@ -35,8 +35,8 @@ def startup_populate():
     db = next(get_db())
     if not db.query(models.Servicio).first():
         db.add_all([
-            models.Servicio(nombre="Corte", duracion_min=60, precio=0),
-            models.Servicio(nombre="Corte + Barba", duracion_min=60, precio=0),
+            models.Servicio(nombre="Corte", duracion_min=45, precio=0),
+            models.Servicio(nombre="Corte + Barba", duracion_min=45, precio=0),
         ])
         db.commit()
 
@@ -128,56 +128,60 @@ def panel_admin(
     db: Session = Depends(get_db),
     admin: str = Depends(verificar_admin),
 ):
-    # Si no elige fecha, usamos la de hoy
-    fecha_ref = datetime.strptime(fecha, "%Y-%m-%d").date() if fecha else date.today()
-    
-    # Calcular Lunes (inicio) y Domingo (fin) de esa semana exacta
-    inicio_semana = fecha_ref - timedelta(days=fecha_ref.weekday())
-    fin_semana = inicio_semana + timedelta(days=6)
-    
-    # Traer todos los turnos confirmados de ESA semana
-    turnos_semana = db.query(models.Turno).filter(
-        models.Turno.fecha_hora_inicio >= datetime.combine(inicio_semana, time.min),
-        models.Turno.fecha_hora_inicio <= datetime.combine(fin_semana, time.max),
-        models.Turno.estado == "confirmado"
-    ).order_by(models.Turno.fecha_hora_inicio.asc()).all()
-
-    horarios = db.query(models.HorarioAtencion).all()
-    excepciones = db.query(models.Excepcion).filter(
-        models.Excepcion.fecha >= inicio_semana,
-        models.Excepcion.fecha <= fin_semana
-    ).all()
-
-    mapa_dias = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"}
-    semana_estructurada = []
-
-    # Armamos la lista día por día (de 0 a 6)
-    for i in range(7):
-        dia_actual = inicio_semana + timedelta(days=i)
-
-        # NUEVO: Omitir días del pasado si estamos mirando la semana actual
-        if dia_actual < date.today():
-            continue
+    # Función interna para armar la estructura de una semana dada una fecha
+    def armar_semana(fecha_referencia):
+        inicio_sem = fecha_referencia - timedelta(days=fecha_referencia.weekday())
+        fin_sem = inicio_sem + timedelta(days=6)
         
-        # 1. Omitir si el día está marcado como CERRADO en el horario habitual
-        horario = next((h for h in horarios if h.dia_semana == dia_actual.weekday()), None)
-        if horario and not horario.abierto:
-            continue
+        turnos_sem = db.query(models.Turno).filter(
+            models.Turno.fecha_hora_inicio >= datetime.combine(inicio_sem, time.min),
+            models.Turno.fecha_hora_inicio <= datetime.combine(fin_sem, time.max),
+            models.Turno.estado == "confirmado"
+        ).order_by(models.Turno.fecha_hora_inicio.asc()).all()
+
+        horarios = db.query(models.HorarioAtencion).all()
+        excepciones = db.query(models.Excepcion).filter(
+            models.Excepcion.fecha >= inicio_sem,
+            models.Excepcion.fecha <= fin_sem
+        ).all()
+
+        mapa_dias = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"}
+        semana_estructurada = []
+
+        for i in range(7):
+            dia_actual = inicio_sem + timedelta(days=i)
+
+            if dia_actual < date.today():
+                continue
             
-        # 2. Omitir si hay una excepción de DÍA COMPLETO para esta fecha
-        exc = next((e for e in excepciones if e.fecha == dia_actual and not e.hora_inicio), None)
-        if exc:
-            continue
+            horario = next((h for h in horarios if h.dia_semana == dia_actual.weekday()), None)
+            if horario and not horario.abierto:
+                continue
+                
+            exc = next((e for e in excepciones if e.fecha == dia_actual and not e.hora_inicio), None)
+            if exc:
+                continue
 
-        # Filtrar solo los turnos de este día específico
-        turnos_dia = [t for t in turnos_semana if t.fecha_hora_inicio.date() == dia_actual]
-        
-        semana_estructurada.append({
-            "fecha_str": dia_actual.strftime("%d/%m"),
-            "nombre_dia": mapa_dias[dia_actual.weekday()],
-            "es_hoy": dia_actual == date.today(),
-            "turnos": turnos_dia
-        })
+            turnos_dia = [t for t in turnos_sem if t.fecha_hora_inicio.date() == dia_actual]
+            
+            semana_estructurada.append({
+                "fecha_str": dia_actual.strftime("%d/%m"),
+                "nombre_dia": mapa_dias[dia_actual.weekday()],
+                "es_hoy": dia_actual == date.today(),
+                "turnos": turnos_dia
+            })
+            
+        return semana_estructurada, inicio_sem, fin_sem
+
+    # Lógica principal de salto automático
+    fecha_ref = datetime.strptime(fecha, "%Y-%m-%d").date() if fecha else date.today()
+    semana_estructurada, inicio_semana, fin_semana = armar_semana(fecha_ref)
+
+    # Si la semana está vacía Y el usuario no eligió manualmente la fecha (entró por defecto),
+    # saltamos automáticamente a la próxima semana.
+    if not semana_estructurada and not fecha:
+        fecha_ref = fecha_ref + timedelta(days=(7 - fecha_ref.weekday())) # Salto al próximo Lunes
+        semana_estructurada, inicio_semana, fin_semana = armar_semana(fecha_ref)
 
     return templates.TemplateResponse(
         request=request,
@@ -262,3 +266,16 @@ def eliminar_excepcion(excepcion_id: int, db: Session = Depends(get_db), admin: 
         db.delete(excepcion)
         db.commit()
     return RedirectResponse(url="/admin/config/excepciones", status_code=303)
+
+# --- NUEVA RUTA: Cancelar Turno ---
+@app.post("/admin/turnos/cancelar/{turno_id}")
+def cancelar_turno(turno_id: int, request: Request, db: Session = Depends(get_db), admin: str = Depends(verificar_admin)):
+    turno = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
+    
+    if turno:
+        turno.estado = "cancelado"
+        db.commit()
+    
+    # Redirigir de vuelta a la misma vista que estaba mirando
+    referer = request.headers.get("referer", "/admin")
+    return RedirectResponse(url=referer, status_code=303)

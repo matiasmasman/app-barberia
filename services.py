@@ -3,7 +3,8 @@ from typing import List
 from sqlalchemy.orm import Session
 from models import Turno, Servicio, HorarioAtencion, Excepcion
 
-INTERVALO_MIN = 60  # Minutos entre cada turno (puedes ajustarlo si cambian los servicios)
+# Ahora la agenda es una cuadrícula perfecta de 45 minutos
+INTERVALO_MIN = 45  
 
 def obtener_turnos_ocupados(db: Session, fecha: date) -> List[Turno]:
     inicio_dia = datetime.combine(fecha, time.min)
@@ -16,7 +17,10 @@ def obtener_turnos_ocupados(db: Session, fecha: date) -> List[Turno]:
 
 def procesar_bloque(cursor, limite, ocupados, excepciones_del_dia, duracion_delta, paso, ahora):
     slots = []
-    while cursor + duracion_delta <= limite:
+    
+    # EL CAMBIO MÁGICO: Mientras el turno EMPIECE antes del cierre (cursor < limite), lo permitimos.
+    # Así, si cierra a las 11:00, el turno de las 10:45 entra perfecto aunque termine 11:30.
+    while cursor < limite:
         slot_inicio = cursor
         slot_fin = cursor + duracion_delta
         
@@ -27,17 +31,22 @@ def procesar_bloque(cursor, limite, ocupados, excepciones_del_dia, duracion_delt
         solapado = False
         for turno in ocupados:
             if slot_inicio < turno.fecha_hora_fin and slot_fin > turno.fecha_hora_inicio:
-                solapado = True; break
+                solapado = True
+                break
                 
         if not solapado:
             for exc in excepciones_del_dia:
                 if exc.hora_inicio and exc.hora_fin:
                     if slot_inicio.time() < exc.hora_fin and slot_fin.time() > exc.hora_inicio:
-                        solapado = True; break
+                        solapado = True
+                        break
                         
         if not solapado:
             slots.append(slot_inicio.strftime("%H:%M"))
+            
+        # Como es bloque fijo, avanzamos siempre 45 minutos
         cursor += paso
+        
     return slots
 
 def calcular_horarios_disponibles(db: Session, fecha: date, duracion_min: int) -> List[str]:
@@ -53,15 +62,18 @@ def calcular_horarios_disponibles(db: Session, fecha: date, duracion_min: int) -
             return []  # Cerrado por excepción todo el día
 
     ocupados = obtener_turnos_ocupados(db, fecha)
-    duracion_delta = timedelta(minutes=duracion_min)
+    
+    # Forzamos que el cálculo visual sea siempre con el intervalo fijo de 45m
+    duracion_delta = timedelta(minutes=INTERVALO_MIN)
     paso = timedelta(minutes=INTERVALO_MIN)
     ahora = datetime.now()
     slots_libres = []
 
     # Calcular slots del Turno 1
-    cursor_1 = datetime.combine(fecha, horario_dia.apertura_1)
-    limite_1 = datetime.combine(fecha, horario_dia.cierre_1)
-    slots_libres.extend(procesar_bloque(cursor_1, limite_1, ocupados, excepciones_del_dia, duracion_delta, paso, ahora))
+    if horario_dia.apertura_1 and horario_dia.cierre_1:
+        cursor_1 = datetime.combine(fecha, horario_dia.apertura_1)
+        limite_1 = datetime.combine(fecha, horario_dia.cierre_1)
+        slots_libres.extend(procesar_bloque(cursor_1, limite_1, ocupados, excepciones_del_dia, duracion_delta, paso, ahora))
 
     # Calcular slots del Turno 2 (si existe)
     if horario_dia.apertura_2 and horario_dia.cierre_2:

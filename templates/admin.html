@@ -11,7 +11,7 @@
         </div>
         
         <div class="flex flex-wrap gap-3 items-center justify-center">
-            <!-- Toggle "Solo Hoy" (Se muestra solo si HOY está dentro de la semana que miramos) -->
+            <!-- Toggle "Solo Hoy" -->
             {% if hoy_esta_en_semana %}
             <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-600 transition hover:bg-slate-900">
                 <input type="checkbox" id="toggleHoy" onchange="filtrarHoy()" class="w-4 h-4 text-violet-600 bg-slate-900 border-slate-500 rounded focus:ring-violet-500 cursor-pointer">
@@ -47,9 +47,20 @@
                         <p class="font-medium text-white text-md mt-1">{{ t.cliente_nombre }}</p>
                         <p class="text-xs text-slate-400 uppercase tracking-wide">{{ t.servicio.nombre }}</p>
                     </div>
-                    <a href="https://wa.me/{{ t.cliente_telefono|replace(' ', '')|replace('-', '') }}" target="_blank" class="text-xs font-bold bg-emerald-700/30 text-emerald-400 border border-emerald-600/30 px-4 py-2 rounded-lg hover:bg-emerald-600 hover:text-white transition flex items-center gap-2">
-                        WhatsApp
-                    </a>
+                    
+                    <!-- Botones de Acción (WhatsApp y Cancelar) -->
+                    <div class="flex flex-col sm:flex-row gap-2 mt-3 sm:mt-0">
+                        <a href="https://wa.me/{{ t.cliente_telefono|replace(' ', '')|replace('-', '') }}" target="_blank" class="text-xs font-bold bg-emerald-700/30 text-emerald-400 border border-emerald-600/30 px-4 py-2 rounded-lg hover:bg-emerald-600 hover:text-white transition flex items-center justify-center gap-2">
+                            WhatsApp
+                        </a>
+                        
+                        <form action="/admin/turnos/cancelar/{{ t.id }}" method="POST" onsubmit="return confirm('¿Confirmás que querés cancelar este turno? El horario volverá a quedar libre.');" class="m-0">
+                            <button type="submit" class="w-full h-full text-xs font-bold bg-red-900/30 text-red-400 border border-red-600/30 px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition flex items-center justify-center">
+                                Cancelar
+                            </button>
+                        </form>
+                    </div>
+
                 </div>
                 {% endfor %}
             </div>
@@ -63,18 +74,13 @@
         </div>
         {% endfor %}
         
-        <!-- Si toda la semana está cerrada (ej: vacaciones) -->
+        <!-- Si toda la semana está cerrada -->
         {% if not semana %}
         <div class="py-12 flex flex-col items-center justify-center opacity-70">
             <span class="text-4xl mb-3">💈</span>
             <p class="text-sm text-slate-400 text-center">La barbería está cerrada toda la semana.</p>
         </div>
         {% endif %}
-    </div>
-
-    <!-- Pie -->
-    <div class="mt-8 text-center pt-4 border-t border-slate-700">
-        <a href="/" class="text-xs text-slate-500 hover:text-violet-400 hover:underline transition">Ir a la vista del cliente</a>
     </div>
 </div>
 
@@ -89,16 +95,13 @@ function filtrarHoy() {
     
     bloques.forEach(bloque => {
         if (soloHoy) {
-            // Si el toggle está activo, mostramos solo los que tienen la clase 'es-hoy'
             bloque.style.display = bloque.classList.contains('es-hoy') ? 'block' : 'none';
         } else {
-            // Si no, mostramos todos
             bloque.style.display = 'block';
         }
     });
 }
 
-// Ejecutar al cargar por si el navegador recuerda que el checkbox quedó tildado
 window.addEventListener('DOMContentLoaded', filtrarHoy);
 </script>
 {% endblock %}
