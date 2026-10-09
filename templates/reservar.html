@@ -18,6 +18,18 @@
                 class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
         </div>
 
+        <!-- CAMPO PROFESIONAL -->
+        <div>
+            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Profesional</label>
+            <select id="profesional" name="profesional_id" required
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                <option value="cualquiera">Cualquiera (El primero disponible)</option>
+                {% for pro in profesionales %}
+                <option value="{{ pro.id }}">{{ pro.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div>
             <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Servicio</label>
             <select id="servicio" name="servicio_id"
@@ -50,20 +62,17 @@
 </div>
 
 <script>
-    // Recibimos los bloqueos desde el servidor
     const diasBloqueados = {{ dias_js | safe }};
     const fechasBloqueadas = {{ fechas_cerradas | safe }};
 
-    // Inicializamos el calendario inteligente
     flatpickr("#fecha", {
         locale: "es",
         minDate: "today",
         disable: [
             function (date) {
-                // Retorna 'true' si el día de la semana está en la lista negra
                 return diasBloqueados.includes(date.getDay());
             },
-            ...fechasBloqueadas // Suma a la lista negra las fechas específicas
+            ...fechasBloqueadas
         ],
         onChange: cargarHorarios
     });
@@ -71,12 +80,15 @@
     async function cargarHorarios() {
         const fecha = document.getElementById('fecha').value;
         const servicioId = document.getElementById('servicio').value;
+        // NUEVO: Leemos qué profesional eligió
+        const profesionalId = document.getElementById('profesional').value;
         const horaSelect = document.getElementById('hora');
 
         if (!fecha || !servicioId) return;
 
         horaSelect.innerHTML = '<option>Cargando horarios...</option>';
-        const res = await fetch(`/api/disponibilidad?fecha=${fecha}&servicio_id=${servicioId}`);
+        // NUEVO: Agregamos el profesional_id a la URL de la API
+        const res = await fetch(`/api/disponibilidad?fecha=${fecha}&servicio_id=${servicioId}&profesional_id=${profesionalId}`);
         const data = await res.json();
 
         horaSelect.innerHTML = '';
@@ -92,22 +104,26 @@
         }
     }
 
-    // Ejecutamos la carga inicial (si el input de fecha no está vacío por Flatpickr)
     if (document.getElementById('fecha').value !== "") {
         cargarHorarios();
     }
-    document.getElementById('servicio').addEventListener('change', cargarHorarios);
-</script>
 
+    // NUEVO: Actualizar si cambia el servicio o el profesional
+    document.getElementById('servicio').addEventListener('change', cargarHorarios);
+    document.getElementById('profesional').addEventListener('change', cargarHorarios); 
+</script>
 
 <!-- Firma del Desarrollador -->
 <div class="mt-4 mb-4 text-center">
-    <a href="https://wa.me/5492616839354?text=Hola%20Matias!%20Vi%20el%20sistema%20de%20turnos%20de%20la%20barber%C3%ADa%20y%20me%20gustar%C3%ADa%20hacerte%20una%20consulta." target="_blank" class="inline-flex items-center gap-1.5 mt-2 text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer">
+    <a href="https://wa.me/5492616839354?text=Hola%20Matias!%20Vi%20el%20sistema%20de%20turnos%20de%20la%20barber%C3%ADa%20y%20me%20gustar%C3%ADa%20hacerte%20una%20consulta."
+        target="_blank"
+        class="inline-flex items-center gap-1.5 mt-2 text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer">
         ¿Necesitás este sistema o un desarrollo a medida? Contactame
         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-            </svg>
-        </a>
+            <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+        </svg>
+    </a>
 </div>
 
 {% endblock %}

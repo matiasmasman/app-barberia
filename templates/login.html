@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center">
+    <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl w-full max-w-md">
+        
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold text-violet-500">Acceso Restringido</h2>
+            <p class="text-slate-400 text-sm mt-1">Ingresá tus credenciales de administrador</p>
+        </div>
+
+        {% if error == 1 %}
+        <div class="bg-red-900/30 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm text-center mb-6">
+            Usuario o contraseña incorrectos.
+        </div>
+        {% endif %}
+
+        <form action="/login" method="POST" class="space-y-5">
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Usuario</label>
+                <input type="text" name="username" required
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition">
+            </div>
+
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Contraseña</label>
+                <input type="password" name="password" required
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition">
+            </div>
+
+            <button type="submit"
+                class="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white font-bold py-3 rounded-lg mt-4 transition shadow-lg shadow-violet-900/20">
+                Iniciar Sesión
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -2,28 +2,67 @@
 
 {% block content %}
 <div class="max-w-4xl mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-    
+
+    <!-- PESTAÑAS DE PROFESIONALES (Solo las ven los jefes) -->
+    {% if usuario.rol in ['superadmin', 'admin_local'] %}
+    <div class="mb-6 flex flex-wrap gap-2 justify-center border-b border-slate-700 pb-6">
+        <!-- Pestaña General -->
+        <a href="/admin?profesional_id=0{% if fecha %}&fecha={{ fecha }}{% endif %}" class="px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 shadow-sm
+           {% if prof_actual_id == 0 %} 
+               bg-gradient-to-r from-blue-600 to-violet-600 text-white border border-transparent
+           {% else %} 
+               bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white 
+           {% endif %}">
+            Todo el Local
+        </a>
+
+        {% for pro in profesionales %}
+        <a href="/admin?profesional_id={{ pro.id }}{% if fecha %}&fecha={{ fecha }}{% endif %}" class="px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 shadow-sm
+           {% if pro.id == prof_actual_id %} 
+               bg-gradient-to-r from-blue-600 to-violet-600 text-white border border-transparent
+           {% else %} 
+               bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white 
+           {% endif %}">
+            Agenda de {{ pro.nombre }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Encabezado -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-700 pb-4">
         <div>
             <h2 class="text-xl font-bold text-violet-500">Agenda Semanal</h2>
-            <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider">Semana del {{ inicio_str }} al {{ fin_str }}</p>
+            <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider">Semana del {{ inicio_str }} al {{ fin_str }}
+            </p>
         </div>
-        
+
         <div class="flex flex-wrap gap-3 items-center justify-center">
             <!-- Toggle "Solo Hoy" -->
             {% if hoy_esta_en_semana %}
-            <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-600 transition hover:bg-slate-900">
-                <input type="checkbox" id="toggleHoy" onchange="filtrarHoy()" class="w-4 h-4 text-violet-600 bg-slate-900 border-slate-500 rounded focus:ring-violet-500 cursor-pointer">
+            <label
+                class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-600 transition hover:bg-slate-900">
+                <input type="checkbox" id="toggleHoy" onchange="filtrarHoy()"
+                    class="w-4 h-4 text-violet-600 bg-slate-900 border-slate-500 rounded focus:ring-violet-500 cursor-pointer">
                 Solo Hoy
             </label>
             {% endif %}
 
             <form method="GET" action="/admin" class="m-0">
-                <input type="date" name="fecha" value="{{ fecha }}" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-white focus:border-violet-500 focus:outline-none cursor-pointer">
+                <input type="hidden" name="profesional_id" value="{{ prof_actual_id }}">
+                <input type="date" name="fecha" value="{{ fecha }}" onchange="this.form.submit()"
+                    class="bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm text-white focus:border-violet-500 focus:outline-none cursor-pointer">
             </form>
-            <a href="/admin/config/horarios" class="text-xs bg-slate-700 text-slate-300 px-3 py-2.5 rounded-lg hover:bg-slate-600 hover:text-white transition font-medium shadow-sm">🕒 Horarios</a>
-            <a href="/admin/config/excepciones" class="text-xs bg-slate-700 text-slate-300 px-3 py-2.5 rounded-lg hover:bg-slate-600 hover:text-white transition font-medium shadow-sm">📅 Excepciones</a>
+
+            <!-- Botones de Configuración (Solo los ven los jefes) -->
+            {% if usuario.rol in ['superadmin', 'admin_local'] %}
+            <a href="/admin/config/horarios?profesional_id={{ prof_actual_id if prof_actual_id != 0 else profesionales[0].id }}"
+                class="text-xs bg-slate-700 text-slate-300 px-3 py-2.5 rounded-lg hover:bg-slate-600 hover:text-white transition font-medium shadow-sm">🕒
+                Horarios</a>
+            <a href="/admin/config/excepciones?profesional_id={{ prof_actual_id if prof_actual_id != 0 else profesionales[0].id }}"
+                class="text-xs bg-slate-700 text-slate-300 px-3 py-2.5 rounded-lg hover:bg-slate-600 hover:text-white transition font-medium shadow-sm">📅
+                Excepciones</a>
+            {% endif %}
         </div>
     </div>
 
@@ -31,31 +70,48 @@
     <div id="lista-semana" class="space-y-8">
         {% for dia in semana %}
         <div class="dia-bloque {% if dia.es_hoy %}es-hoy{% endif %}">
-            
+
             <!-- Título del Día -->
-            <h3 class="text-md font-bold mb-3 border-b border-slate-700 pb-2 {% if dia.es_hoy %}text-amber-500{% else %}text-slate-300{% endif %}">
+            <h3
+                class="text-md font-bold mb-3 border-b border-slate-700 pb-2 {% if dia.es_hoy %}text-amber-500{% else %}text-slate-300{% endif %}">
                 {{ dia.nombre_dia }} {{ dia.fecha_str }} {% if dia.es_hoy %}(Hoy){% endif %}
             </h3>
-            
+
             <!-- Turnos del Día -->
             {% if dia.turnos %}
-            <div class="divide-y divide-slate-700/50 bg-slate-900/40 rounded-xl border border-slate-700/50 overflow-hidden shadow-inner">
+            <div
+                class="divide-y divide-slate-700/50 bg-slate-900/40 rounded-xl border border-slate-700/50 overflow-hidden shadow-inner">
                 {% for t in dia.turnos %}
                 <div class="p-4 flex justify-between items-center hover:bg-slate-800/80 transition">
                     <div>
-                        <span class="text-violet-400 font-mono font-bold text-lg">{{ t.fecha_hora_inicio.strftime('%H:%M') }} - {{ t.fecha_hora_fin.strftime('%H:%M') }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-violet-400 font-mono font-bold text-lg">{{
+                                t.fecha_hora_inicio.strftime('%H:%M') }} - {{ t.fecha_hora_fin.strftime('%H:%M')
+                                }}</span>
+                            <!-- NUEVO: Etiqueta del profesional (Solo visible en Todo el Local) -->
+                            {% if prof_actual_id == 0 %}
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-700 text-slate-300">
+                                {{ t.profesional.nombre }}
+                            </span>
+                            {% endif %}
+                        </div>
                         <p class="font-medium text-white text-md mt-1">{{ t.cliente_nombre }}</p>
                         <p class="text-xs text-slate-400 uppercase tracking-wide">{{ t.servicio.nombre }}</p>
                     </div>
-                    
+
                     <!-- Botones de Acción (WhatsApp y Cancelar) -->
                     <div class="flex flex-col sm:flex-row gap-2 mt-3 sm:mt-0">
-                        <a href="https://wa.me/{{ t.cliente_telefono|replace(' ', '')|replace('-', '') }}" target="_blank" class="text-xs font-bold bg-emerald-700/30 text-emerald-400 border border-emerald-600/30 px-4 py-2 rounded-lg hover:bg-emerald-600 hover:text-white transition flex items-center justify-center gap-2">
+                        <a href="https://wa.me/{{ t.cliente_telefono|replace(' ', '')|replace('-', '') }}"
+                            target="_blank"
+                            class="text-xs font-bold bg-emerald-700/30 text-emerald-400 border border-emerald-600/30 px-4 py-2 rounded-lg hover:bg-emerald-600 hover:text-white transition flex items-center justify-center gap-2">
                             WhatsApp
                         </a>
-                        
-                        <form action="/admin/turnos/cancelar/{{ t.id }}" method="POST" onsubmit="return confirm('¿Confirmás que querés cancelar este turno? El horario volverá a quedar libre.');" class="m-0">
-                            <button type="submit" class="w-full h-full text-xs font-bold bg-red-900/30 text-red-400 border border-red-600/30 px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition flex items-center justify-center">
+
+                        <form action="/admin/turnos/cancelar/{{ t.id }}" method="POST"
+                            onsubmit="return confirm('¿Confirmás que querés cancelar este turno? El horario volverá a quedar libre.');"
+                            class="m-0">
+                            <button type="submit"
+                                class="w-full h-full text-xs font-bold bg-red-900/30 text-red-400 border border-red-600/30 px-4 py-2 rounded-lg hover:bg-red-600 hover:text-white transition flex items-center justify-center">
                                 Cancelar
                             </button>
                         </form>
@@ -70,10 +126,10 @@
                 <p class="text-sm text-slate-500">No hay turnos para este día.</p>
             </div>
             {% endif %}
-            
+
         </div>
         {% endfor %}
-        
+
         <!-- Si toda la semana está cerrada -->
         {% if not semana %}
         <div class="py-12 flex flex-col items-center justify-center opacity-70">
@@ -86,22 +142,22 @@
 
 <!-- Script para el Toggle de "Solo Hoy" -->
 <script>
-function filtrarHoy() {
-    const toggle = document.getElementById('toggleHoy');
-    if (!toggle) return; 
-    
-    const soloHoy = toggle.checked;
-    const bloques = document.querySelectorAll('.dia-bloque');
-    
-    bloques.forEach(bloque => {
-        if (soloHoy) {
-            bloque.style.display = bloque.classList.contains('es-hoy') ? 'block' : 'none';
-        } else {
-            bloque.style.display = 'block';
-        }
-    });
-}
+    function filtrarHoy() {
+        const toggle = document.getElementById('toggleHoy');
+        if (!toggle) return;
 
-window.addEventListener('DOMContentLoaded', filtrarHoy);
+        const soloHoy = toggle.checked;
+        const bloques = document.querySelectorAll('.dia-bloque');
+
+        bloques.forEach(bloque => {
+            if (soloHoy) {
+                bloque.style.display = bloque.classList.contains('es-hoy') ? 'block' : 'none';
+            } else {
+                bloque.style.display = 'block';
+            }
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', filtrarHoy);
 </script>
 {% endblock %}

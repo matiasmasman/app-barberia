@@ -1,15 +1,16 @@
 from datetime import datetime, date, time, timedelta
 from typing import List
 from sqlalchemy.orm import Session
-from models import Turno, Servicio, HorarioAtencion, Excepcion
+from models import Turno, HorarioAtencion, Excepcion, Profesional
 
 # Ahora la agenda es una cuadrícula perfecta de 45 minutos
 INTERVALO_MIN = 45  
 
-def obtener_turnos_ocupados(db: Session, fecha: date) -> List[Turno]:
+def obtener_turnos_ocupados(db: Session, profesional_id: int, fecha: date) -> List[Turno]:
     inicio_dia = datetime.combine(fecha, time.min)
     fin_dia = datetime.combine(fecha, time.max)
     return db.query(Turno).filter(
+        Turno.profesional_id == profesional_id,
         Turno.fecha_hora_inicio >= inicio_dia,
         Turno.fecha_hora_inicio <= fin_dia,
         Turno.estado == "confirmado"
@@ -19,7 +20,6 @@ def procesar_bloque(cursor, limite, ocupados, excepciones_del_dia, duracion_delt
     slots = []
     
     # EL CAMBIO MÁGICO: Mientras el turno EMPIECE antes del cierre (cursor < limite), lo permitimos.
-    # Así, si cierra a las 11:00, el turno de las 10:45 entra perfecto aunque termine 11:30.
     while cursor < limite:
         slot_inicio = cursor
         slot_fin = cursor + duracion_delta
@@ -49,21 +49,27 @@ def procesar_bloque(cursor, limite, ocupados, excepciones_del_dia, duracion_delt
         
     return slots
 
-def calcular_horarios_disponibles(db: Session, fecha: date, duracion_min: int) -> List[str]:
+def calcular_horarios_disponibles(db: Session, profesional_id: int, fecha: date, duracion_min: int) -> List[str]:
     dia_semana = fecha.weekday()
-    horario_dia = db.query(HorarioAtencion).filter(HorarioAtencion.dia_semana == dia_semana).first()
+    horario_dia = db.query(HorarioAtencion).filter(
+        HorarioAtencion.profesional_id == profesional_id,
+        HorarioAtencion.dia_semana == dia_semana
+    ).first()
 
     if not horario_dia or not horario_dia.abierto:
         return []
 
-    excepciones_del_dia = db.query(Excepcion).filter(Excepcion.fecha == fecha).all()
+    excepciones_del_dia = db.query(Excepcion).filter(
+        Excepcion.profesional_id == profesional_id,
+        Excepcion.fecha == fecha
+    ).all()
+    
     for exc in excepciones_del_dia:
         if not exc.hora_inicio or not exc.hora_fin:
             return []  # Cerrado por excepción todo el día
 
-    ocupados = obtener_turnos_ocupados(db, fecha)
+    ocupados = obtener_turnos_ocupados(db, profesional_id, fecha)
     
-    # Forzamos que el cálculo visual sea siempre con el intervalo fijo de 45m
     duracion_delta = timedelta(minutes=INTERVALO_MIN)
     paso = timedelta(minutes=INTERVALO_MIN)
     ahora = datetime.now()
@@ -82,3 +88,22 @@ def calcular_horarios_disponibles(db: Session, fecha: date, duracion_min: int) -
         slots_libres.extend(procesar_bloque(cursor_2, limite_2, ocupados, excepciones_del_dia, duracion_delta, paso, ahora))
 
     return slots_libres
+
+def calcular_horarios_comercio(db: Session, comercio_id: int, fecha: date, duracion_min: int) -> List[str]:
+    """
+    Usa esta función cuando el cliente selecciona "Cualquier Barbero".
+    Junta los horarios disponibles de todos los profesionales activos.
+    """
+    profesionales = db.query(Profesional).filter(
+        Profesional.comercio_id == comercio_id, 
+        Profesional.activo == True
+    ).all()
+    
+    todos_los_slots = set() # Usamos un Set para que no haya horarios repetidos (ej: dos tienen libre a las 17:00)
+    
+    for p in profesionales:
+        slots_pro = calcular_horarios_disponibles(db, p.id, fecha, duracion_min)
+        todos_los_slots.update(slots_pro)
+        
+    # Ordenamos la lista resultante de menor a mayor (ej: 10:00, 10:45, 11:30)
+    return sorted(list(todos_los_slots))
