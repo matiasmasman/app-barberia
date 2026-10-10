@@ -73,6 +73,7 @@
     flatpickr("#fecha", {
         locale: "es",
         minDate: "today",
+        defaultDate: "today",
         disable: [
             function (date) {
                 return diasBloqueados.includes(date.getDay());

@@ -116,28 +116,37 @@ def logout():
 
 # 1. Página principal de reserva (para clientes)
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, reserva: str | None = None, db: Session = Depends(get_db)):
+def index(request: Request, db: Session = Depends(get_db), reserva: str = None):
     comercio = db.query(models.Comercio).first()
+    if not comercio:
+        # Prevención de errores si la base de datos está vacía
+        return HTMLResponse("Sistema en mantenimiento. No hay comercios configurados.")
+        
+    profesionales = db.query(models.Profesional).filter(models.Profesional.comercio_id == comercio.id).all()
+    servicios = db.query(models.Servicio).filter(models.Servicio.comercio_id == comercio.id).all()
     
-    # NUEVO: Traemos todos los profesionales activos de este comercio
-    profesionales = db.query(models.Profesional).filter_by(comercio_id=comercio.id, activo=True).all()
-    servicios = db.query(models.Servicio).filter_by(comercio_id=comercio.id).all()
-    hoy = date.today().isoformat()
+    # Lógica SaaS: Buscamos qué días cerró el profesional principal en su panel
+    dias_cerrados = []
+    if profesionales:
+        horarios_cerrados = db.query(models.HorarioAtencion).filter(
+            models.HorarioAtencion.profesional_id == profesionales[0].id,
+            models.HorarioAtencion.abierto == False
+        ).all()
+        # Armamos una lista de números [0, 1, etc] para mandarle al JavaScript
+        dias_cerrados = [(h.dia_semana + 1) % 7 for h in horarios_cerrados]
 
-    # Como el cliente puede elegir "Cualquiera", la validación de días cerrados
-    # la pasamos a manejar dinámicamente con la API, así que enviamos listas vacías por ahora.
     return templates.TemplateResponse(
         request=request,
         name="reservar.html",
         context={
             "request": request,
-            "profesionales": profesionales, # Pasamos los barberos al HTML
+            "comercio": comercio,
+            "profesionales": profesionales,
             "servicios": servicios,
-            "hoy": hoy,
-            "dias_js": "[]", 
-            "fechas_cerradas": "[]",
             "reserva_exitosa": reserva == "exitosa",
-        },
+            "dias_js": str(dias_cerrados),
+            "fechas_cerradas": "[]"
+        }
     )
 
 # 2. Endpoint API de disponibilidad
