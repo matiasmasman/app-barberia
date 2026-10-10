@@ -1,9 +1,15 @@
+import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from dotenv import load_dotenv
 
-# URL de conexión al contenedor Docker: postgresql://usuario:password@host:puerto/nombre_bd
-SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://postgres:admin123@localhost:5432/saas_turnos"
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+if not SQLALCHEMY_DATABASE_URL:
+    raise RuntimeError("DATABASE_URL no está definida. Configurala en el archivo .env")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 

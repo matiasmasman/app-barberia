@@ -39,6 +39,40 @@ def obtener_usuario_actual(request: Request, db: Session = Depends(get_db)):
         
     return user
 
+
+def _parse_profesional_id(valor) -> int | None:
+    if valor in (None, "", "0"):
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def resolver_profesional_objetivo(
+    usuario_actual: models.Usuario,
+    profesional_id_solicitado: int | None,
+    db: Session,
+) -> models.Profesional:
+    """Resuelve el profesional de la operación y bloquea IDOR de rol 'profesional'."""
+    if usuario_actual.rol == "profesional":
+        propio_id = usuario_actual.profesional_id
+        if propio_id is None:
+            raise HTTPException(status_code=403, detail="No autorizado")
+        if profesional_id_solicitado is not None and profesional_id_solicitado != propio_id:
+            raise HTTPException(status_code=403, detail="No autorizado")
+        profesional = db.query(models.Profesional).filter_by(id=propio_id).first()
+    else:
+        if profesional_id_solicitado is not None:
+            profesional = db.query(models.Profesional).filter_by(id=profesional_id_solicitado).first()
+        else:
+            profesional = db.query(models.Profesional).first()
+
+    if not profesional:
+        raise HTTPException(status_code=404, detail="Profesional no encontrado")
+    return profesional
+
+
 # --- RUTAS DE LOGIN Y LOGOUT ---
 @app.get("/login", response_class=HTMLResponse)
 def vista_login(request: Request, error: int = 0):
@@ -82,7 +116,7 @@ def logout():
 
 # 1. Página principal de reserva (para clientes)
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+def index(request: Request, reserva: str | None = None, db: Session = Depends(get_db)):
     comercio = db.query(models.Comercio).first()
     
     # NUEVO: Traemos todos los profesionales activos de este comercio
@@ -102,6 +136,7 @@ def index(request: Request, db: Session = Depends(get_db)):
             "hoy": hoy,
             "dias_js": "[]", 
             "fechas_cerradas": "[]",
+            "reserva_exitosa": reserva == "exitosa",
         },
     )
 
@@ -268,17 +303,27 @@ def panel_admin(
 
 # --- 5. RUTAS DE HORARIO HABITUAL ---
 @app.get("/admin/config/horarios", response_class=HTMLResponse)
-def panel_horarios(request: Request, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
-    profesional = db.query(models.Profesional).first()
+def panel_horarios(
+    request: Request,
+    profesional_id: int = None,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(obtener_usuario_actual),
+):
+    profesional = resolver_profesional_objetivo(usuario_actual, profesional_id, db)
     horarios = db.query(models.HorarioAtencion).filter_by(profesional_id=profesional.id).order_by(models.HorarioAtencion.dia_semana.asc()).all()
 
     mapa_dias = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"}
-    return templates.TemplateResponse(request=request, name="config_horarios.html", context={"request": request, "horarios": horarios, "mapa_dias": mapa_dias})
+    return templates.TemplateResponse(
+        request=request,
+        name="config_horarios.html",
+        context={"request": request, "horarios": horarios, "mapa_dias": mapa_dias, "profesional": profesional},
+    )
 
 @app.post("/admin/config/horarios")
 async def guardar_horarios(request: Request, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     form = await request.form()
-    profesional = db.query(models.Profesional).first()
+    solicitado = _parse_profesional_id(form.get("profesional_id") or request.query_params.get("profesional_id"))
+    profesional = resolver_profesional_objetivo(usuario_actual, solicitado, db)
     
     for i in range(7):
         horario = db.query(models.HorarioAtencion).filter_by(profesional_id=profesional.id, dia_semana=i).first()
@@ -296,23 +341,33 @@ async def guardar_horarios(request: Request, db: Session = Depends(get_db), usua
             horario.cierre_2 = datetime.strptime(ci2, "%H:%M").time() if ci2 else None
                 
     db.commit()
-    return RedirectResponse(url="/admin/config/horarios", status_code=303)
+    return RedirectResponse(url=f"/admin/config/horarios?profesional_id={profesional.id}", status_code=303)
 
 # --- 6. RUTAS DE EXCEPCIONES ---
 @app.get("/admin/config/excepciones", response_class=HTMLResponse)
-def panel_excepciones(request: Request, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
-    profesional = db.query(models.Profesional).first()
+def panel_excepciones(
+    request: Request,
+    profesional_id: int = None,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(obtener_usuario_actual),
+):
+    profesional = resolver_profesional_objetivo(usuario_actual, profesional_id, db)
     excepciones = db.query(models.Excepcion).filter(
         models.Excepcion.profesional_id == profesional.id,
         models.Excepcion.fecha >= date.today()
     ).order_by(models.Excepcion.fecha.asc()).all()
     
-    return templates.TemplateResponse(request=request, name="config_excepciones.html", context={"request": request, "excepciones": excepciones})
+    return templates.TemplateResponse(
+        request=request,
+        name="config_excepciones.html",
+        context={"request": request, "excepciones": excepciones, "profesional": profesional},
+    )
 
 @app.post("/admin/config/excepciones")
 async def agregar_excepcion(request: Request, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     form = await request.form()
-    profesional = db.query(models.Profesional).first()
+    solicitado = _parse_profesional_id(form.get("profesional_id") or request.query_params.get("profesional_id"))
+    profesional = resolver_profesional_objetivo(usuario_actual, solicitado, db)
     
     nueva_excepcion = models.Excepcion(
         profesional_id=profesional.id,
@@ -326,25 +381,39 @@ async def agregar_excepcion(request: Request, db: Session = Depends(get_db), usu
 
     db.add(nueva_excepcion)
     db.commit()
-    return RedirectResponse(url="/admin/config/excepciones", status_code=303)
+    return RedirectResponse(url=f"/admin/config/excepciones?profesional_id={profesional.id}", status_code=303)
 
 # --- 7. ELIMINAR EXCEPCIÓN ---
 @app.post("/admin/config/excepciones/eliminar/{excepcion_id}")
-def eliminar_excepcion(excepcion_id: int, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
+def eliminar_excepcion(
+    excepcion_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(obtener_usuario_actual),
+):
     excepcion = db.query(models.Excepcion).filter_by(id=excepcion_id).first()
-    if excepcion:
-        db.delete(excepcion)
-        db.commit()
-    return RedirectResponse(url="/admin/config/excepciones", status_code=303)
+    if not excepcion:
+        raise HTTPException(status_code=404, detail="Excepción no encontrada")
+
+    if usuario_actual.rol == "profesional" and excepcion.profesional_id != usuario_actual.profesional_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    profesional_id = excepcion.profesional_id
+    db.delete(excepcion)
+    db.commit()
+    return RedirectResponse(url=f"/admin/config/excepciones?profesional_id={profesional_id}", status_code=303)
 
 # --- CANCELAR TURNO ---
 @app.post("/admin/turnos/cancelar/{turno_id}")
 def cancelar_turno(turno_id: int, request: Request, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     turno = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
-    
-    if turno:
-        turno.estado = "cancelado"
-        db.commit()
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+
+    if usuario_actual.rol == "profesional" and turno.profesional_id != usuario_actual.profesional_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    turno.estado = "cancelado"
+    db.commit()
     
     referer = request.headers.get("referer", "/admin")
     return RedirectResponse(url=referer, status_code=303)

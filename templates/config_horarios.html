@@ -4,12 +4,13 @@
     <div class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
         <h2 class="text-xl font-bold text-violet-500">Horario Habitual</h2>
         <div class="flex gap-4">
-            <a href="/admin/config/excepciones" class="text-sm text-slate-300 hover:text-white transition">Ir a Excepciones</a>
+            <a href="/admin/config/excepciones?profesional_id={{ profesional.id }}" class="text-sm text-slate-300 hover:text-white transition">Ir a Excepciones</a>
             <a href="/admin" class="text-sm text-violet-400 hover:text-violet-300 transition">Volver a Turnos</a>
         </div>
     </div>
 
     <form action="/admin/config/horarios" method="POST" class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 space-y-3">
+        <input type="hidden" name="profesional_id" value="{{ profesional.id }}">
         
         <!-- Texto de ayuda movido arriba -->
         <div class="bg-amber-900/20 border border-amber-700/50 rounded-lg p-3 mb-4">

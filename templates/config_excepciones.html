@@ -4,13 +4,14 @@
     <div class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
         <h2 class="text-xl font-bold text-violet-500">Feriados y Excepciones</h2>
         <div class="flex gap-4">
-            <a href="/admin/config/horarios" class="text-sm text-slate-300 hover:text-white transition">Ir a Horarios</a>
+            <a href="/admin/config/horarios?profesional_id={{ profesional.id }}" class="text-sm text-slate-300 hover:text-white transition">Ir a Horarios</a>
             <a href="/admin" class="text-sm text-violet-400 hover:text-violet-300 transition">Volver a Turnos</a>
         </div>
     </div>
 
     <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
         <form action="/admin/config/excepciones" method="POST" class="bg-slate-900/50 p-4 rounded-lg mb-8 border border-slate-700">
+            <input type="hidden" name="profesional_id" value="{{ profesional.id }}">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-xs uppercase text-slate-400 mb-1">Fecha exacta</label>

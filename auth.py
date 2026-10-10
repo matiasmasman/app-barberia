@@ -1,10 +1,17 @@
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 from jose import jwt
 from passlib.context import CryptContext
+from dotenv import load_dotenv
 
-# Configuraciones de Seguridad (En producción, esto va en variables de entorno)
-SECRET_KEY = "firma_criptografica_super_secreta_para_blue_team"
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY no está definida. Configurala en el archivo .env")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 días de duración
 
@@ -18,12 +25,9 @@ def get_password_hash(password):
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-        
-    # El token se auto-destruye cuando expira
+    if expires_delta is None:
+        expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
